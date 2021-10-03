@@ -20,7 +20,7 @@ variable "linode_image" {
 
 variable "label" {
   description = "Human-friendly name"
-  default = "mediawiki-base"
+  default = "linode-base"
 }
 
 variable "region" {
@@ -32,12 +32,6 @@ variable "flavor" {
   description = "Cloud server flavor"
   default = "g6-standard-1"
 }
-
-// variable "stackscript_id" {
-//   description = "provisioning script ID"
-//   type = number
-//   default = 909122
-// }
 
 // end vars
 
@@ -64,7 +58,7 @@ build {
 
 
   provisioner "ansible" {
-    playbook_file = "/Users/gizzmonic/code/riichilab/ansible-roles/linode-base.yml"
+    playbook_file = "~/code/riichilab/ansible-roles/linode-base.yml"
   }
 
 }
