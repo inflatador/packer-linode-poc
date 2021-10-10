@@ -1,0 +1,16 @@
+#!/bin/sh
+
+#zramstart inspired by https://github.com/mystilleef/FedoraZram.git
+
+modprobe zram
+
+printf "{{ zram_size }}M" > /sys/block/zram0/mem_limit
+printf "{{ zram_size }}M" > /sys/block/zram0/disksize
+
+grep -q zram0 /proc/swaps
+if [ $? -ne 0 ]
+then
+	logger "zram0 device not found....creating"
+	mkswap /dev/zram0  > /dev/null 2>&1
+	swapon /dev/zram0  > /dev/null 2>&1
+fi

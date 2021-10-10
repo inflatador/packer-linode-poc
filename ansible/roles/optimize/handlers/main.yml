@@ -1,0 +1,7 @@
+---
+- name: trigger udevadm
+  shell: udevadm trigger
+
+- name: reload systemd
+  systemd:
+    daemon_reload: yes

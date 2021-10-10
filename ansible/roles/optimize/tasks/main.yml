@@ -1,0 +1,114 @@
+---
+
+# installing extra modules: https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/managing_monitoring_and_updating_the_kernel/managing-kernel-modules_managing-monitoring-and-updating-the-kernel
+- name: install kernel extra modules
+  dnf:
+    name: kernel-modules-extra
+    state: latest
+
+# this assumes the active kernel is the latest kernel, because we
+# always run the "patch" role before this role.
+
+- name: register active kernel
+  shell: uname -r
+  register: active_kernel
+
+- name: decompress TCP illinois module
+  shell: "unxz --force --keep /lib/modules/{{active_kernel.stdout}}/kernel/net/ipv4/tcp_illinois.ko.xz"
+
+- name: copy TCP illinois module into the modules directory
+  copy:
+    src: "/lib/modules/{{active_kernel.stdout}}/kernel/net/ipv4/tcp_illinois.ko"
+    dest: "/lib/modules/{{active_kernel.stdout}}/"
+    mode: preserve
+    remote_src: yes
+
+- name: decompress zram module
+  shell: "unxz --force --keep /lib/modules/{{active_kernel.stdout}}/kernel/drivers/block/zram/zram.ko.xz"
+
+- name: copy zram module into modules directory
+  copy:
+    src: "/lib/modules/{{active_kernel.stdout}}/kernel/drivers/block/zram/zram.ko"
+    dest: "/lib/modules/{{active_kernel.stdout}}/"
+    mode: preserve
+    remote_src: yes
+
+- name: update module dependency list
+  shell: "depmod -a"
+
+- name: load needed modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - tcp_illinois
+    - zram
+
+- name: make module loading persistent
+  copy:
+    content: |
+      # load {{ item }} at boot
+      {{ item }}
+    dest: "/etc/modules-load.d/{{ item }}.conf"
+    mode: 0644
+    owner: root
+    group: root
+  loop:
+    - tcp_illinois
+    - zram
+
+
+# - name: print the sysctl var
+#   debug:
+#     var: "{{ sysctl_settings['net.ipv4.tcp_congestion_control'] }}"
+
+- name: adjust sysctl values
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_set: yes
+    state: present
+    reload: yes
+  loop: "{{ sysctl_settings | dict2items }}"
+
+- name: copy zram static files into place
+  copy:
+    src: "../files/{{ item }}"
+    dest: "/usr/local/sbin/{{ item }}"
+    owner: root
+    group: root
+    mode: 750
+  loop:
+    - zramstop
+    - zramstat
+
+- name: render zramstart template
+  template:
+    src: "../templates/zramstart.j2"
+    dest: /usr/local/sbin/zramstart
+    owner: root
+    group: root
+    mode: 0750
+
+- name: copy zram unit file into place
+  copy:
+    src: "../files/mkzram.service"
+    dest: /etc/systemd/system/mkzram.service
+    owner: root
+    group: root
+    mode: 0644
+  notify: reload systemd
+
+- name: enable mkzram service
+  systemd:
+    name: mkzram
+    state: started
+    enabled: yes
+
+- name: use 'none' I/O scheduler
+  copy:
+    src: ../files/88-ioscheduler.rules
+    dest: /etc/udev/rules.d/88-ioscheduler.rules
+  notify: trigger udevadm
+
+...

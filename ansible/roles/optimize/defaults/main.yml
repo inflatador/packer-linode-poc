@@ -1,0 +1,5 @@
+---
+
+zram_size: "{{ (ansible_memtotal_mb*0.20)|int|abs }}"
+
+...
