@@ -1,0 +1,5 @@
+---
+iptables_path: /etc/sysconfig/iptables
+ip6tables_path: /etc/sysconfig/ip6tables
+iptables_pkgs:
+  - iptables-services

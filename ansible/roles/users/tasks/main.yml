@@ -1,0 +1,37 @@
+---
+- name: include ansible vault-encrypted vars
+  include_vars:
+    file: secrets.yml
+  no_log: True
+
+- name: Fail if password is blank
+  assert:
+    that:
+      - user_pass is defined and user_pass != ''
+
+- name: create local users
+  user:
+    name: "{{ item }}"
+    shell: /bin/bash
+    password: "{{ user_pass |password_hash('sha512') }}"
+    groups: "{{ sudo_group }}"
+    append: yes
+  loop: "{{ users }}"
+
+- name: add user ssh key
+  authorized_key:
+    user: "{{ item }}"
+    state: present
+    key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN+5ssY+G2SlScd6n5oXTxNvAsO8EfGU9syjHN1llYE9 root@Clankio2.local"
+  loop: "{{ users }}"
+
+- name: add local users to sudoers with no passwd
+  copy:
+    dest: /etc/sudoers.d/10-{{ item }}
+    content: |
+             {{ item }} ALL=(ALL)       NOPASSWD: ALL
+    owner: root
+    group: root
+    mode: 0600
+  loop: "{{ users }}"
+...

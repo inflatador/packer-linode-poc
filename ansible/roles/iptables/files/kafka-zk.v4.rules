@@ -1,0 +1,1 @@
+ -A INPUT -i eth1 -j ACCEPT

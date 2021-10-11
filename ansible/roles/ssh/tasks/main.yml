@@ -1,0 +1,10 @@
+---
+
+- name: install preferred sshd_config file
+  copy:
+    src: ../files/sshd_config
+    dest: /etc/ssh/sshd_config
+    owner: root
+    group: "{{ sshd_group }}"
+    mode: 0644
+  notify: restart sshd

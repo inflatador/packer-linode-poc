@@ -1,0 +1,75 @@
+---
+- name: Load OS-specific vars
+  include_vars: "{{lookup('first_found', params) }}"
+  vars:
+    params:
+      files:
+        - "../vars/{{ ansible_facts['os_family'] }}.yml"
+      paths:
+        - 'vars'
+
+- name: stop and disable firewalld
+  systemd:
+    name: firewalld
+    state: stopped
+    masked: yes
+    enabled: no
+
+- name: install iptables pkgs
+  package:
+    name: "{{ item }}"
+    state: latest
+  loop: "{{ iptables_pkgs }}"
+
+
+- name: set default iptables rules
+  copy:
+    src: ../templates/rules.v4
+    dest: "{{ iptables_path }}"
+    owner: root
+    group: root
+    mode: 0640
+  # when: ansible_hostname =! "vpntest_ep00"
+
+- name: set default ip6tables rules
+  copy:
+    src: ../templates/rules.v6
+    dest: "{{ ip6tables_path }}"
+    owner: root
+    group: root
+    mode: 0640
+
+- name: insert host-specific iptables rules
+  blockinfile:
+    block: "{{ item }}"
+    path: "{{ iptables_path }}"
+    insertafter: "## BEGIN HOST-SPECIFIC RULES"
+  with_file:
+    - "{{ansible_hostname}}.v4.rules"
+  notify: load iptables rules
+  ignore_errors: yes
+
+- name: insert host-specific ip6tables rules
+  blockinfile:
+    block: "{{ item }}"
+    path: "{{ ip6tables_path }}"
+    insertafter: "## BEGIN HOST-SPECIFIC RULES"
+  with_file:
+    - "{{ansible_hostname}}.v6.rules"
+  notify: load ip6tables rules
+  ignore_errors: yes
+
+- name: load ip6tables rules
+  shell: "ip6tables-restore < {{ ip6tables_path }}"
+
+- name: load iptables rules
+  shell: "iptables-restore < {{ iptables_path }}"
+
+- name: enable iptables services
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - iptables
+    - ip6tables

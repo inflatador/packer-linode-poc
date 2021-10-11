@@ -1,0 +1,3 @@
+---
+
+sshd_group: "{{ 'wheel' if ansible_os_family == 'FreeBSD' else 'root' }}"
