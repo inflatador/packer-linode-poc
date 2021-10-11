@@ -1,0 +1,74 @@
+---
+
+- name: add /usr/local/bin to root's path
+  copy:
+    src: ../files/bash_profile
+    dest: /root/.bash_profile
+    owner: root
+    group: root
+    mode: 0600
+    backup: yes
+    seuser: system_u
+    serole: object_r
+    setype: admin_home_t
+    selevel: s0
+
+- name: configure EL8 servers for auto-patching
+  block:
+    # - name: install
+    - name: install dnf and base pkgs
+      yum:
+        name: "{{ pkgs }}"
+        state: latest
+      vars:
+        pkgs:
+        - dnf-utils
+        - dnf-automatic
+        - epel-release
+        - git
+        - tar
+        - tcpdump
+
+    - name: configure for automatic patching
+      ini_file:
+        path: /etc/dnf/automatic.conf
+        section: commands
+        option: apply_updates
+        value: "yes"
+        mode: 0644
+        backup: yes
+
+    - name: enable automatic patching timer
+      systemd:
+        name: dnf-automatic-install.timer
+        state: started
+        enabled: yes
+
+    - name: apply all available updates
+      yum:
+        name: "*"
+        state: latest
+
+    - name: check if restart is necessary
+      shell: /usr/bin/needs-restarting -r
+      changed_when: False
+      register: needs_restarting
+      ignore_errors: yes
+
+    # - name: print needs_restarting var
+    #   debug:
+    #     var: needs_restarting
+
+    - name: restart to apply updates
+      block:
+        - name: reboot
+          reboot:
+
+        - name: wait for server to boot up
+          wait_for:
+            port: 22
+            timeout: 60
+      when: needs_restarting.rc == 1
+
+
+  # when: ansible_pkg_mgr == "dnf"
